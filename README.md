@@ -13,9 +13,9 @@ However, in certain scenarios, users still need to perform some complex operatio
 
 ## Usage Scenarios
 
-- **Centralized StackSet Management**: Simplify the management of CloudFormation StackSets across multiple AWS accounts within an organization.
-- **Automated Compliance**: Ensure all accounts within the organization have the required StackSets deployed.
-- **Error Recovery**: Easily identify and redeploy failed or drifted StackSet instances.
+- **Centralized StackSet Management**: The AWS CloudFormation StackSet console does not provide statistics for Stack Instances in various states, making it inconvenient to intuitively grasp the deployment status of the StackSet within the organization.StackSet PowerTools provides the following intuitive statistics for instances: total number of instances, In Sync, Drifted, SUCCEEDED, FAILED, as well as SKIPPED_SUSPENDED_ACCOUNT and the number of accounts in the organization where the StackSet is not deployed. Users do not need to use filters to separately count these instance states.
+- **Automated Compliance**: If a StackSet was initially set to manual deployment or restricted automatic deployment to specific OUs, some accounts in the organization may not automatically deploy the StackSet, even if the StackSet is later set to automatic deployment. StackSet PowerTools offers a feature to automatically compare the deployment status of Organization Accounts and StackSet instances, adding accounts that have not deployed the StackSet to the StackSet's management.
+- **Error Recovery**: For cases where individual StackSet instances fail to deploy, the AWS CloudFormation StackSet console does not provide the capability to redeploy specific instances. StackSet PowerTools can automatically redeploy FAILED or Drifted instances without having to redeploy all instances.
 - **Resource Cleanup**: Remove StackSet instances from suspended accounts to maintain a clean environment.
 
 ## Installation

@@ -12,9 +12,9 @@ AWS CloudFormation StackSet 允许你通过一次操作在多个 AWS 账户和�
 
 ## 使用场景
 
-- **集中管理StackSet**: 简化跨多个AWS账户管理CloudFormation StackSet。
-- **自动化合规**: 确保组织内所有账户都部署了所需的StackSet。
-- **错误恢复**: 轻松识别并重新部署失败或漂移的StackSet实例。
+- **集中管理StackSet**: AWS CloudFormation StackSet Console并没有各种状态的Stack Instance统计，不便于直观掌握StackSet在Organization下的部署情况。StackSet PowerTools提供了以下的instance直观统计：总instance数量，In Sync，Drifted，SUCCEEDED, FAILED, 以及SKIPPED_SUSPENDED_ACCOUNT和Organization中未部署该StackSet的Account数量，用户不必使用Filter来分别统计这些instance状态。
+- **自动化合规**: 如StackSet最初设置为手动或者限制了自动部署的OU，某些Organization中Account并不会自动部署StackSet，即便后期将StackSet设置为自动部署。StackSet PowerTools提供了自动比对Organization Accounts和StackSet instance部署状态的功能，将未部署StackSet的Account加入StackSet的管理。
+- **错误恢复**: 对于个别StackSet Instance部署失败的情况，AWS CloudFormation StackSet console并未提供针对特定Instance重新执行部署的功能，StackSet PowerTools可以自动对FAILED或者Drifted Instance执行重新的部署，而不必所有的Instance都执行部署过程。
 - **资源清理**: 从挂起的账户中删除StackSet实例，保持清洁的环境。
 
 ## 安装
