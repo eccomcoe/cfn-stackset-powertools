@@ -42,6 +42,7 @@ However, in certain scenarios, users still need to perform some complex operatio
    export AWS_DEFAULT_REGION=your_aws_region
    ```
    or set env with [aws-vault](https://github.com/99designs/aws-vault) utility
+   or deploy StackSet PowerTools to an EC2 or Container with CloudFormation permissions.
 
 4. **Run the application:**
 

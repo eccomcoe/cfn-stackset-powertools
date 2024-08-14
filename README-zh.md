@@ -41,6 +41,7 @@ AWS CloudFormation StackSet 允许你通过一次操作在多个 AWS 账户和�
    export AWS_DEFAULT_REGION=your_aws_region
    ```
    或使用[aws-vault](https://github.com/99designs/aws-vault) 工具进行设置
+   或者将StackSet PowerTools部署到具备CloudFormation权限的EC2和容器中
 
 4. **运行应用程序:**
 
