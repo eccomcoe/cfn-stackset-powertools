@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CloudFormation StackSet PowerTools</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+        }
+
+        .container-fluid {
+            padding-left: 15px;
+            padding-right: 15px;
+        }
+
+        .table-responsive {
+            margin-top: 20px;
+        }
+
+        .progress-bar-container {
+            display: none;
+            position: relative;
+            width: 100%;
+            height: 5px;
+            background-color: #007bff;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            width: 0;
+            height: 100%;
+            background-color: #28a745;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <h1>CloudFormation StackSet PowerTools</h1>
+        <button id="reloadStackSetsButton" class="btn btn-info mb-3" onclick="reloadStackSets()">Reload StackSet
+            Info</button>
+        <div class="form-group">
+            <label for="ignoreAccounts">Ignore Accounts:</label>
+            <select multiple class="form-control" id="ignoreAccounts" style="height: 200px;">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-striped w-100">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>StackSet Name</th>
+                        <th>AutoDeployment</th>
+                        <th>Total Instances</th>
+                        <th>In Sync</th>
+                        <th>Drifted</th>
+                        <th>SUCCEEDED</th>
+                        <th>FAILED</th>
+                        <th>SKIPPED_SUSPENDED_ACCOUNT</th>
+                        <th>Not Deployed Accounts</th>
+                        <th>Actions<br>
+                            <div class="form-group form-check">
+                                <input type="checkbox" class="form-check-input" id="dryRunSwitch" checked>
+                                <label class="form-check-label" for="dryRunSwitch">Dry Run</label>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="stackSetsTableBody">
+                    {% for details in stack_set_details_list %}
+                    <tr>
+                        <td>{{ details.StackSetName }}</td>
+                        <td>{{ details.AutoDeployment }}</td>
+                        <td>{{ details.TotalInstances }}</td>
+                        <!-- In Sync -->
+                        <td>
+                            <a href="#" data-toggle="modal" data-target="#inSyncModal{{ loop.index }}">{{ details.InSync
+                                }}</a>
+                            <div class="modal fade" id="inSyncModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="inSyncModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="inSyncModalLabel{{ loop.index }}">In Sync
+                                                Instances - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="inSyncModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- Drifted -->
+                        <td>
+                            <a href="#" data-toggle="modal" data-target="#driftedModal{{ loop.index }}">{{
+                                details.Drifted }}</a>
+                            <div class="modal fade" id="driftedModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="driftedModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="driftedModalLabel{{ loop.index }}">Drifted
+                                                Instances - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="driftedModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- SUCCEEDED -->
+                        <td>
+                            <a href="#" data-toggle="modal" data-target="#succeededModal{{ loop.index }}">{{
+                                details.Succeeded }}</a>
+                            <div class="modal fade" id="succeededModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="succeededModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="succeededModalLabel{{ loop.index }}">Succeeded
+                                                Instances - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="succeededModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- FAILED -->
+                        <td>
+                            <a href="#" data-toggle="modal" data-target="#failedModal{{ loop.index }}">{{ details.Failed
+                                }}</a>
+                            <div class="modal fade" id="failedModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="failedModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="failedModalLabel{{ loop.index }}">Failed
+                                                Instances - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="failedModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- SKIPPED_SUSPENDED_ACCOUNT -->
+                        <td>
+                            <a href="#" data-toggle="modal"
+                                data-target="#skippedSuspendedAccountModal{{ loop.index }}">{{
+                                details.SkippedSuspendedAccount }}</a>
+                            <div class="modal fade" id="skippedSuspendedAccountModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="skippedSuspendedAccountModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title"
+                                                id="skippedSuspendedAccountModalLabel{{ loop.index }}">Skipped/Suspended
+                                                Account Instances - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="skippedSuspendedAccountModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <a href="#" data-toggle="modal" data-target="#accountModal{{ loop.index }}">{{
+                                details.NotDeployedAccounts }}</a>
+                            <div class="modal fade" id="accountModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="accountModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="accountModalLabel{{ loop.index }}">未推送账户 - {{
+                                                details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul>
+                                                {% for account in details.NotDeployedAccountDetails %}
+                                                <li>{{ account.Name }} ({{ account.Id }})</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress-bar-container" id="progressBar{{ loop.index }}">
+                                <div class="progress-bar"></div>
+                            </div>
+                            <button class="btn btn-danger btn-sm"
+                                onclick="removeSuspendedAccounts('{{ details.StackSetName }}', {{ loop.index }})" {% if
+                                details.SkippedSuspendedAccount==0 %}disabled{% endif %}>
+                                Remove Suspended(Deletec) Accounts
+                            </button>
+                            <button class="btn btn-primary btn-sm"
+                                onclick="addUndeployedAccounts('{{ details.StackSetName }}', {{ loop.index }})" {% if
+                                details.NotDeployedAccounts==0 %}disabled{% endif %}>
+                                Add NOT (Automated) Deployed Accounts in Org
+                            </button>
+                            <button class="btn btn-warning btn-sm"
+                                onclick="retryFailedInstances('{{ details.StackSetName }}', {{ loop.index }})" {% if
+                                details.Failed==0 %}disabled{% endif %}>
+                                Redeploy Failed Instances
+                            </button>
+                            <button class="btn btn-secondary btn-sm"
+                                onclick="retryDriftedInstances('{{ details.StackSetName }}', {{ loop.index }})" {% if
+                                details.Drifted==0 %}disabled{% endif %}>
+                                Redeploy Drifted Instances
+                            </button>
+
+                            <!-- Remove suspended accounts modal -->
+                            <div class="modal fade" id="removeModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="removeModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="removeModalLabel{{ loop.index }}">Remove
+                                                Suspended Accounts - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="removeModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add undeployed accounts modal -->
+                            <div class="modal fade" id="addModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="addModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="addModalLabel{{ loop.index }}">Add Undeployed
+                                                Accounts - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="addModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Retry failed instances modal -->
+                            <div class="modal fade" id="retryModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="retryModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="retryModalLabel{{ loop.index }}">Retry Failed
+                                                Instances - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="retryModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Retry drifted instances modal -->
+                            <div class="modal fade" id="retryDriftedModal{{ loop.index }}" tabindex="-1"
+                                aria-labelledby="retryDriftedModalLabel{{ loop.index }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="retryDriftedModalLabel{{ loop.index }}">Retry
+                                                Drifted Instances - {{ details.StackSetName }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <ul id="retryDriftedModalBody{{ loop.index }}"></ul>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        function showProgressBar(index) {
+            $('#progressBar' + index).show();
+            $('#progressBar' + index + ' .progress-bar').css('width', '0%');
+            $('#progressBar' + index + ' .progress-bar').animate({ width: '100%' }, 5000);
+        }
+
+        function hideProgressBar(index) {
+            $('#progressBar' + index).hide();
+            $('#progressBar' + index + ' .progress-bar').stop();
+            $('#progressBar' + index + ' .progress-bar').css('width', '0%');
+        }
+
+        function reloadStackSets() {
+            const reloadButton = $('#reloadStackSetsButton');
+            reloadButton.prop('disabled', true);
+
+            showProgressBar();
+
+            $.ajax({
+                type: 'GET',
+                url: '/',
+                success: function (response) {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(response, 'text/html');
+                    const newTableBody = doc.querySelector('#stackSetsTableBody');
+
+                    $('#stackSetsTableBody').html(newTableBody.innerHTML);
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar();
+                    reloadButton.prop('disabled', false);
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            $.ajax({
+                type: 'GET',
+                url: '/get_organization_accounts',
+                success: function (accounts) {
+                    const ignoreAccountsSelect = $('#ignoreAccounts');
+                    accounts.sort((a, b) => a.Name.localeCompare(b.Name)); // 按名称排序
+                    accounts.forEach(account => {
+                        ignoreAccountsSelect.append(new Option(account.Name + ' (' + account.Id + ')', account.Id));
+                    });
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                }
+            });
+        });
+
+        function getIgnoreAccounts() {
+            const ignoreAccounts = [];
+            $('#ignoreAccounts option:selected').each(function () {
+                ignoreAccounts.push($(this).val());
+            });
+            return ignoreAccounts;
+        }
+
+        function removeSuspendedAccounts(stackSetName, index) {
+            const dryRun = $('#dryRunSwitch').is(':checked');
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/remove_suspended_accounts',
+                data: JSON.stringify({ stackSetName: stackSetName, dryRun: dryRun, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#removeModalBody' + index);
+                    modalBody.empty();
+                    if (response.accounts) {
+                        response.accounts.forEach(account => {
+                            modalBody.append('<li>' + account.Account + ' (' + account.Region + ') - ' + ' (' + account.OrganizationalUnitId + ') - ' + account.Status + '</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#removeModal' + index).modal('show');
+                    if (!dryRun) {
+                        setTimeout(() => location.reload(), 3000);
+                    }
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        function addUndeployedAccounts(stackSetName, index) {
+            const dryRun = $('#dryRunSwitch').is(':checked');
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/add_undeployed_accounts',
+                data: JSON.stringify({ stackSetName: stackSetName, dryRun: dryRun, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#addModalBody' + index);
+                    modalBody.empty();
+                    if (response.accounts) {
+                        response.accounts.forEach(account => {
+                            modalBody.append('<li>' + account.Name + ' (' + account.Id + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#addModal' + index).modal('show');
+                    if (!dryRun) {
+                        setTimeout(() => location.reload(), 3000);
+                    }
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        function retryFailedInstances(stackSetName, index) {
+            const dryRun = $('#dryRunSwitch').is(':checked');
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/retry_failed_instances',
+                data: JSON.stringify({ stackSetName: stackSetName, dryRun: dryRun, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#retryModalBody' + index);
+                    modalBody.empty();
+                    if (response.instances) {
+                        response.instances.forEach(instance => {
+                            modalBody.append('<li>' + instance.Account + ' (' + instance.Region + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#retryModal' + index).modal('show');
+                    if (!dryRun) {
+                        setTimeout(() => location.reload(), 3000);
+                    }
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        function retryDriftedInstances(stackSetName, index) {
+            const dryRun = $('#dryRunSwitch').is(':checked');
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/retry_drifted_instances',
+                data: JSON.stringify({ stackSetName: stackSetName, dryRun: dryRun, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#retryDriftedModalBody' + index);
+                    modalBody.empty();
+                    if (response.instances) {
+                        response.instances.forEach(instance => {
+                            modalBody.append('<li>' + instance.Account + ' (' + instance.Region + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#retryDriftedModal' + index).modal('show');
+                    if (!dryRun) {
+                        setTimeout(() => location.reload(), 3000);
+                    }
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        function showInSyncInstances(stackSetName, index) {
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/get_in_sync_instances',
+                data: JSON.stringify({ stackSetName: stackSetName, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#inSyncModalBody' + index);
+                    modalBody.empty();
+                    if (response.instances) {
+                        response.instances.forEach(instance => {
+                            modalBody.append('<li>' + instance.Account + ' (' + instance.Region + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#inSyncModal' + index).modal('show');
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        // 绑定点击事件到 In Sync 列
+        $(document).on('click', '[data-target^="#inSyncModal"]', function () {
+            const index = $(this).data('target').replace('#inSyncModal', '');
+            const stackSetName = $(this).closest('tr').find('td:first').text();
+            showInSyncInstances(stackSetName, index);
+        });
+
+        function showDriftedInstances(stackSetName, index) {
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/get_drifted_instances',
+                data: JSON.stringify({ stackSetName: stackSetName, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#driftedModalBody' + index);
+                    modalBody.empty();
+                    if (response.instances) {
+                        response.instances.forEach(instance => {
+                            modalBody.append('<li>' + instance.Account + ' (' + instance.Region + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#driftedModal' + index).modal('show');
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        $(document).on('click', '[data-target^="#driftedModal"]', function () {
+            const index = $(this).data('target').replace('#driftedModal', '');
+            const stackSetName = $(this).closest('tr').find('td:first').text();
+            showDriftedInstances(stackSetName, index);
+        });
+        function showSucceededInstances(stackSetName, index) {
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/get_succeeded_instances',
+                data: JSON.stringify({ stackSetName: stackSetName, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#succeededModalBody' + index);
+                    modalBody.empty();
+                    if (response.instances) {
+                        response.instances.forEach(instance => {
+                            modalBody.append('<li>' + instance.Account + ' (' + instance.Region + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#succeededModal' + index).modal('show');
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        $(document).on('click', '[data-target^="#succeededModal"]', function () {
+            const index = $(this).data('target').replace('#succeededModal', '');
+            const stackSetName = $(this).closest('tr').find('td:first').text();
+            showSucceededInstances(stackSetName, index);
+        });
+
+        function showFailedInstances(stackSetName, index) {
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/get_failed_instances',
+                data: JSON.stringify({ stackSetName: stackSetName, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#failedModalBody' + index);
+                    modalBody.empty();
+                    if (response.instances) {
+                        response.instances.forEach(instance => {
+                            modalBody.append('<li>' + instance.Account + ' (' + instance.Region + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#failedModal' + index).modal('show');
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        $(document).on('click', '[data-target^="#failedModal"]', function () {
+            const index = $(this).data('target').replace('#failedModal', '');
+            const stackSetName = $(this).closest('tr').find('td:first').text();
+            showFailedInstances(stackSetName, index);
+        });
+
+        function showSkippedSuspendedAccountInstances(stackSetName, index) {
+            const ignoreAccounts = getIgnoreAccounts();
+
+            showProgressBar(index);
+
+            $.ajax({
+                type: 'POST',
+                url: '/get_skipped_suspended_account_instances',
+                data: JSON.stringify({ stackSetName: stackSetName, ignoreAccounts: ignoreAccounts }),
+                contentType: 'application/json',
+                success: function (response) {
+                    const modalBody = $('#skippedSuspendedAccountModalBody' + index);
+                    modalBody.empty();
+                    if (response.instances) {
+                        response.instances.forEach(instance => {
+                            modalBody.append('<li>' + instance.Account + ' (' + instance.Region + ')</li>');
+                        });
+                    } else {
+                        modalBody.append('<li>' + response.message + '</li>');
+                    }
+                    $('#skippedSuspendedAccountModal' + index).modal('show');
+                },
+                error: function (error) {
+                    alert('Error: ' + error.responseJSON.message);
+                },
+                complete: function () {
+                    hideProgressBar(index);
+                }
+            });
+        }
+
+        $(document).on('click', '[data-target^="#skippedSuspendedAccountModal"]', function () {
+            const index = $(this).data('target').replace('#skippedSuspendedAccountModal', '');
+            const stackSetName = $(this).closest('tr').find('td:first').text();
+            showSkippedSuspendedAccountInstances(stackSetName, index);
+        });
+    </script>
+</body>
+
+</html>
