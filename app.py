@@ -1,6 +1,7 @@
 from flask import Flask, render_template, jsonify, request
 import boto3
 import os
+import functools
 
 app = Flask(__name__)
 
@@ -43,6 +44,22 @@ def get_organization_accounts_route():
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 
+@functools.lru_cache(maxsize=128)
+def get_stack_instances(stack_set_name):
+    instances = []
+    next_token = None
+    while True:
+        if next_token:
+            stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
+        else:
+            stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
+        
+        instances.extend(stack_instance_details.get('Summaries', []))
+        next_token = stack_instance_details.get('NextToken')
+        if not next_token:
+            break
+    return instances
+
 @app.route('/')
 def list_stacksets():
     try:
@@ -74,25 +91,15 @@ def list_stacksets():
             auto_deployment = stack_set_info.get('AutoDeployment', {})
             
             # 获取stack instances的详细信息
-            instances = []
-            next_token = None
-            while True:
-                if next_token:
-                    stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-                else:
-                    stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-                
-                instances.extend(stack_instance_details.get('Summaries', []))
-                next_token = stack_instance_details.get('NextToken')
-                if not next_token:
-                    break
+            get_stack_instances.cache_clear()
+            instances = get_stack_instances(stack_set_name)
             
             total_instances = len(instances)
             in_sync = sum(1 for instance in instances if instance['DriftStatus'] == 'IN_SYNC')
             drifted = sum(1 for instance in instances if instance['DriftStatus'] == 'DRIFTED')
             succeeded = sum(1 for instance in instances if instance['StackInstanceStatus']['DetailedStatus'] == 'SUCCEEDED')
             failed = sum(1 for instance in instances if instance['StackInstanceStatus']['DetailedStatus'] == 'FAILED')
-            skipped_suspended_account = sum(1 for instance in instances if instance['Status'] == 'OUTDATED')
+            skipped_suspended_account = sum(1 for instance in instances if instance['StackInstanceStatus']['DetailedStatus'] == 'SKIPPED_SUSPENDED_ACCOUNT')
             
             # 计算未推送StackSet的账户
             deployed_account_ids = {instance['Account'] for instance in instances}
@@ -131,18 +138,7 @@ def add_undeployed_accounts():
         root_ou_id = get_organization_root_ou_id()
 
         # List stack instances to get deployed accounts
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         deployed_account_ids = {instance['Account'] for instance in instances}
 
         # Calculate undeployed account IDs
@@ -178,7 +174,6 @@ def get_organization_root_ou_id():
     except Exception as e:
         raise Exception(f"Failed to retrieve organization root OU ID: {str(e)}")
 
-
 @app.route('/remove_suspended_accounts', methods=['POST'])
 def remove_suspended_accounts():
     data = request.get_json()
@@ -187,23 +182,11 @@ def remove_suspended_accounts():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         outdated_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
-            for instance in instances if instance['Status'] == 'OUTDATED'
+            for instance in instances if instance['StackInstanceStatus']['DetailedStatus'] == 'SKIPPED_SUSPENDED_ACCOUNT' and instance['Account'] not in ignore_accounts
         ]
         
         account_statuses = {}
@@ -259,19 +242,7 @@ def retry_failed_instances():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         failed_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
@@ -307,19 +278,7 @@ def retry_drifted_instances():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         drifted_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
@@ -354,19 +313,7 @@ def get_in_sync_instances():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         in_sync_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
@@ -387,19 +334,7 @@ def get_drifted_instances():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         drifted_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
@@ -420,19 +355,7 @@ def get_succeeded_instances():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         succeeded_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
@@ -453,19 +376,7 @@ def get_failed_instances():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         failed_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
@@ -486,23 +397,11 @@ def get_skipped_suspended_account_instances():
     ignore_accounts = set(data.get('ignoreAccounts', []))
     
     try:
-        # 获取stack instances的详细信息
-        instances = []
-        next_token = None
-        while True:
-            if next_token:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
-            else:
-                stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            
-            instances.extend(stack_instance_details.get('Summaries', []))
-            next_token = stack_instance_details.get('NextToken')
-            if not next_token:
-                break
+        instances = get_stack_instances(stack_set_name)
         
         skipped_suspended_account_instances = [
             {'Account': instance['Account'], 'Region': instance['Region'], 'OrganizationalUnitId': instance['OrganizationalUnitId']}
-            for instance in instances if instance['Status'] == 'OUTDATED' and instance['Account'] not in ignore_accounts
+            for instance in instances if instance['StackInstanceStatus']['DetailedStatus'] == 'SKIPPED_SUSPENDED_ACCOUNT' and instance['Account'] not in ignore_accounts
         ]
         
         if not skipped_suspended_account_instances:
