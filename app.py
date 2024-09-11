@@ -47,8 +47,18 @@ def get_organization_accounts_route():
 def list_stacksets():
     try:
         # 获取Service-managed的StackSets
-        response = cloudformation_client.list_stack_sets(Status='ACTIVE', CallAs='DELEGATED_ADMIN')
-        stack_sets = response.get('Summaries', [])
+        stack_sets = []
+        next_token = None
+        while True:
+            if next_token:
+                response = cloudformation_client.list_stack_sets(Status='ACTIVE', CallAs='DELEGATED_ADMIN', NextToken=next_token)
+            else:
+                response = cloudformation_client.list_stack_sets(Status='ACTIVE', CallAs='DELEGATED_ADMIN')
+            
+            stack_sets.extend(response.get('Summaries', []))
+            next_token = response.get('NextToken')
+            if not next_token:
+                break
 
         # 获取组织中的所有账户
         organization_accounts = get_organization_accounts()
@@ -63,8 +73,19 @@ def list_stacksets():
             
             auto_deployment = stack_set_info.get('AutoDeployment', {})
             
-            stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
-            instances = stack_instance_details.get('Summaries', [])
+            # 获取stack instances的详细信息
+            instances = []
+            next_token = None
+            while True:
+                if next_token:
+                    stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN', NextToken=next_token)
+                else:
+                    stack_instance_details = cloudformation_client.list_stack_instances(StackSetName=stack_set_name, CallAs='DELEGATED_ADMIN')
+                
+                instances.extend(stack_instance_details.get('Summaries', []))
+                next_token = stack_instance_details.get('NextToken')
+                if not next_token:
+                    break
             
             total_instances = len(instances)
             in_sync = sum(1 for instance in instances if instance['DriftStatus'] == 'IN_SYNC')
