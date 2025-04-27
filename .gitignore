@@ -63,3 +63,4 @@ venv/
 
 # pycache
 __pycache__
+app.log
